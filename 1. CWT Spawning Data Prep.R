@@ -8,7 +8,7 @@ library(ggplot2)
 library(purrr)
 library(lubridate)
 
-setwd("~/winter-run-cohort-reconstruction")
+setwd("~/winter-run-cohort-reconstruction-main")
 #############################################
 #####        Release data           #########
 #############################################
@@ -49,9 +49,10 @@ CWT_Recoveries <- CWT_Recoveries %>%
 ##########Escapement to Hatchery#############
 #############################################
 CWT_Hatchery<-CWT_Recoveries %>%
-      filter(fishery ==50) %>%
+      filter(fishery == 50) %>%
       mutate(estimated_number = ifelse(is.na(estimated_number), 1, estimated_number))%>% #assuming NAs are 1 (aka 100% sampling of fish recovered are at the hatchery)
-      mutate(Individuals = estimated_number*Value_Expanded)
+      mutate(Individuals = estimated_number*Value_Expanded) 
+
 EscapeToHatchery<-CWT_Hatchery %>%
   group_by(run_year, brood_year) %>%
   summarise(Escapement_to_Hatchery = sum(Value_Expanded, na.rm = TRUE)) %>%
@@ -74,7 +75,7 @@ EscapeToHatchery_M<-CWT_Hatchery %>%
   mutate(Age = run_year-brood_year)%>%
   pivot_wider(names_from = Age, values_from = Escapement_to_Hatchery, names_sort=TRUE) %>%
   group_by(brood_year) %>%
-  summarize(Age2Hat = sum(`2`, na.rm = TRUE), Age3Hat = sum(`3`, na.rm = TRUE) 
+  summarize(Age1Hat = sum(`1`, na.rm = TRUE), Age2Hat = sum(`2`, na.rm = TRUE), Age3Hat = sum(`3`, na.rm = TRUE) 
             , Age4Hat = sum(`4`, na.rm = TRUE))
 #reorganizing it by run year, for hatchery cohort reconstruction_sex
 EscapeToHatchery_M_RY<-CWT_Hatchery %>%
@@ -84,7 +85,7 @@ EscapeToHatchery_M_RY<-CWT_Hatchery %>%
   mutate(Age = run_year-brood_year)%>%
   pivot_wider(names_from = Age, values_from = Escapement_to_Hatchery, names_sort=TRUE) %>%
   group_by(run_year) %>%
-  summarize(Age2Hat = sum(`2`, na.rm = TRUE), Age3Hat = sum(`3`, na.rm = TRUE) #For CWT Reconstruction
+  summarize(Age1Hat = sum(`1`, na.rm = TRUE),Age2Hat = sum(`2`, na.rm = TRUE), Age3Hat = sum(`3`, na.rm = TRUE) #For CWT Reconstruction
             , Age4Hat = sum(`4`, na.rm = TRUE))
 #For females
 EscapeToHatchery_F<-CWT_Hatchery %>%
@@ -152,6 +153,9 @@ Escapement_BY<-Escapement %>%
   group_by(brood_year) %>%
   summarize(Age1Sp = sum(`1`, na.rm = TRUE), Age2Sp = sum(`2`, na.rm = TRUE), Age3Sp = sum(`3`, na.rm = TRUE)
             , Age4Sp = sum(`4`, na.rm = TRUE), Age5Sp = sum(`5`, na.rm = TRUE))
+#non-bootstrapped values for sensitivity anlaysis
+# write.csv(Escapement_BY, "CWT to SG.csv", row.names = FALSE)
+
 Escapement_Run<-Escapement %>%
   group_by(run_year) %>%
   summarize(Age1Sp = sum(`1`, na.rm = TRUE), Age2Sp = sum(`2`, na.rm = TRUE), Age3Sp = sum(`3`, na.rm = TRUE)
@@ -240,7 +244,7 @@ CWT_AgeProp_M$Age_Prop<-CWT_AgeProp_M$n/CWT_AgeProp_M$total
 CWT_AgeProp_M<-pivot_wider(CWT_AgeProp_M, names_from = "Age", values_from = Age_Prop)
 CWT_AgeProp_M<-CWT_AgeProp_M %>%
   group_by(run_year) %>%
-  summarise(`2`=sum(`2`, na.rm = TRUE),`3`=sum(`3`, na.rm = TRUE),`4`=sum(`4`, na.rm = TRUE))
+  summarise(`1`=sum(`1`, na.rm = TRUE),`2`=sum(`2`, na.rm = TRUE),`3`=sum(`3`, na.rm = TRUE),`4`=sum(`4`, na.rm = TRUE))
 #Estimating the age and sex-specific escapement of each brood year. 
 for(j in 1:1000){
   #Females
@@ -255,18 +259,17 @@ for(j in 1:1000){
               , Age4Sp = sum(`4`, na.rm = TRUE), Age5Sp = sum(`5`, na.rm = TRUE))
   
   #Males
-  Male_Age<-cbind(CWT_AgeProp_M[,1],HatcheryMaleRun[,1]*CWT_AgeProp_M[,2:4])
-  Male_Age<-pivot_longer(Male_Age, cols = c(`2`,`3`,`4`),values_to = "Individuals", names_to = "Age")
+  Male_Age<-cbind(CWT_AgeProp_M[,1],HatcheryMaleRun[,1]*CWT_AgeProp_M[,2:5])
+  Male_Age<-pivot_longer(Male_Age, cols = c(`1`,`2`,`3`,`4`),values_to = "Individuals", names_to = "Age")
   Male_Age$Age<-as.numeric(Male_Age$Age)
   Male_Age$brood_year<-Male_Age$run_year-Male_Age$Age
   Male_Age<-pivot_wider(Male_Age, names_from = "Age", values_from = "Individuals")
   Cohort_M[[j]]<-Male_Age %>%
     group_by(brood_year) %>%
-    summarize(Age2Sp = sum(`2`, na.rm = TRUE), Age3Sp = sum(`3`, na.rm = TRUE)
+    summarize(Age1Sp = sum(`1`, na.rm = TRUE), Age2Sp = sum(`2`, na.rm = TRUE), Age3Sp = sum(`3`, na.rm = TRUE)
               , Age4Sp = sum(`4`, na.rm = TRUE))
   
 }
-test<-Cohort_M[[2]]
 # saveRDS(Cohort, file = "CWTBootstraps.Rds")
 # saveRDS(Cohort_F, file = "CWTBootstraps_F.Rds")
 # saveRDS(Cohort_M, file = "CWTBootstraps_M.Rds")
